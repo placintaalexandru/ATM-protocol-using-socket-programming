@@ -1,0 +1,115 @@
+	/* PLACINTA ALEXANDRU - 324CB - FISIER README */
+
+
+	OBSERVATIE: Am plecat de la scheletul laboratorului 8, modificand anumite lucruri si adaugand unele functionalitati pentru a intdeplini cerintele temei
+
+
+	0. Structuri de date folosite:
+
+			Pentru implementarea temei am folosit un tip enum, CardStatus, pentru a stoca posibilitatile de status ale unu cont, daca este blocat sau nu, acestea fiind
+		singurele sale valori.
+			Pe langa acest enum am mai creat 2 structuri: ListCel( celula dintr-o lista simplu inlantuita pe care o folosesc sa stochez perechile de carduri si socket-urile pentru ele, pentru
+		dispozitivele ligate cu succes si o lista in care retin socket-urile tuturor dispozitivelor conectate la server. Fac acest lucur pentru a le inchide la final si pentru a sti cui sa trimit mesaj de
+		inchidere).
+			Cea de-a doua structura folosita este cea de tip ClientAccount, strutura in care pe langa cele 6 campuri de baza ( nume, prenume, numar card, parola, parola secreta, sold) am mai adaugat
+		2 campuri esentiale care imi determinau statusul cardului, statul cardului ( pentru a vedea daca e blocat sau nu) si numarul de incercari consecutive pentruun card ( numarul de parole introduse gresit
+		consecutiv pentru contul respectiv).
+			Aceste campuri le-am introdus, deoarece daca se introduce o parola gresita pentru un cont, acel numar se incerementeaza, iar daca se ajunge la 3, statutul cardului va deveni blocat.
+			In acest fel eu retin pentru un cont cate incercari gresite ale parolei s-au introdus si il fac 0 doar la o autentificare corecta pe acel cont. Daca se incerca o operatie pe un card blocat
+		server-ul intoarce eroare de card blocat.
+			Acest lucru e esential, deoarece in acest mod identific foarte usor daca un card e blocat, sau daca s-au introdus 3 incercari gresite de parola pentru un cont, fara a crea bug-ul urmator:
+				- introduc de 2 ori un pin gresit pentru un cont, iar apoi daca introduc alt cont si dau logat sau daca introduc alt cont gresit, se va reseta numarul de incercari pentru primul cont
+
+
+	1. Functii standard folosite:
+
+		In marea majoritate a implementarii temei am folosit functii urmatoare:
+			- strtok - pentru a spargei in token-uri mesajele primite atat de server cat si de clienti, pentru numarul de card, putmoney si getmoney
+			- snprintf - pentru concatena la un string un numar
+			- strcat - penttru a crea un mesaj prin concatenarea mai multor parti ale acestuia
+			- strncpy - pentru a vedea ce comanda se citeste de la tastatura
+			- strstr - pentru a vedea daca un mesaj primit contine anumite parti in acesta	
+
+
+	2. Ideea de implementare:
+
+			Se incepe prin a ase rula server-ul, compilarea acestuia se face prin compilarea fisierului "server.c" si "accountcreator.c".
+			Sursa "accountcreator.c" contine functiile necesare de citire din fisier a datelor conturilor, de alocare a memoriei si de eliberare a acesteia.
+			Sursa "server.c" contine toate functiile necesare serverului pentru a-si indeplini functionalitatea.
+			Pentru a tine  evidetna a conturilor am folosit un vector de structuri in care le-am retinut.
+			Pe lanaga campurile din tema pentru un cont, am mai adaugat numarul maxim de parole gresite si statusul cardului, pentru a sti daca un card e blocat si cate
+		parole gresite consecutive s-au introdus.
+			Pe langa acest vector retin o lista cu cardurile si socket-urile asociate acestora, care reprezinta conturile active la un moment dat pe server, si o lista a socket-urilor
+		de la un moment dat, aceasta reprezentand lista dispozitivelor conectate. Aceste liste au fost denumite corespunzator pentru a nu crea confuzii la corectare.
+
+
+			Ideea de implementare decurge in felul urmator:
+
+				Am folosit variabilele de tip "fd_set" pentru a tine minte socket-urile folosite la server si la client.
+				Din client citesc comenzile de la tastatura, valoarea 0 a scoket-ului, iar apoi in functie de sirul de caractere citit verific ce operatie trebuie sa execut:
+			login, logout, getmoney, putmoney, listsold, unlock sau quit.
+				
+				Daca efectuez operatia de login, verific daca sun logat, caz in care nu mai transmit nimic la server si intorc mesaj de eroare corespunzator, iar daca nu sutn logat,
+			transmit mesajul server-ului, urmand ca acesta sa sparga mesajul in token-uri cu ajutorul functiei strtok si sa verifice daca numarul de card sau parola sunt bine introduse si sa intoarca mesajul
+			corespunzator. Aici exista 3 cazuri: numar card incorect, numar de card inexistent si parola gresita. Pentru a valida operatia de login verific daca numarul de card e vlaid si nu se afla prin lista
+			de conturi active, caz in care am un utilizator nou si intorc mesajul corespunzator.
+				Daca clientul primeste un mesaj ce contine sirul "Welcome" variabila "loggedIn" devine true, deoarece asta inseamna ca server-ul a validat login-ul.
+
+				Daca efectuez operatia de logout, trimit mesajul la server, doar daca sunt logat, acesta analizand daca exista un numar de card asociat socket-ului de pe care a primit acel mesaj de logout si intoarce un mesaj 				corespunzator pentru cele 2 cazuri aferente: clientul e logat sau nu.
+			
+				Daca efectuez operatia de listare sold verific daca sun logat, iar apoi trimit cererea server-ului, acesta urmand sa intoarca soldul prin gasirea numarului de card asociat socekt-ului pe care a
+			primit cererea, iar apoi de la numarul de card sa gaseasca contul si sa intoarca soldul asociat acestuia, din vectorul de conturi.
+
+				Operatiile putmoney si getmoney pot spune ca sunt asemanatoare, fiind una inversul celeilalte.
+				Pentru ambele am procedat la fel, efectul la server fiind diferit. Pentru ambele verific daca sunt logat pe clientul curent, iar apoi trimit cererea la server. Server-ul analizeaza cererea si cauta
+			contul respectiv dupa numarul de card pe care il ia din lista de de carduri si sokcet-uri.
+
+				Daca efectuez operatia de unlock, atunci se stie ca s-a incercat un login inaitne, asa ca la fiecare operatie de login memorie numarul cardului cu care se face login, iar la
+			fiecare logout de pe un client acea variabila revine la valoarea sa intiala, adica -1, astfel, daca se va incerca unlock se va sti numarul de card de catre server si acesta va mai avea nevoie doar de parola
+			secreta.
+				Daca ultimul numar de card e -1, atunci se va primi mesaj eroare cum ca nu exista numar de card, acest lucru indicand ca ultimul cont incercat nu este blocat.
+				Daca acea variabila e diferita de -1, atunci s-a incercat un login care a dus sau nu blocarea unui card, sau a atras atentia ca un card e blocat, iar server-ul se va uita si a analiza corecti
+			tudinea numarului de card, daca exista vreun cont cu acel numar de card sau nu, iar daca exista se va uita daca este blocat sau nu, caz in care e va intoarce mesaj de operatie nereusita, altfel se va cere
+			de la client parola secreta.
+
+				Daca efectuez operatia de quit de la client, acesta va trimite cererea server-ului, acesta urmand sa stearga intrarile ce contin acel socket din lista de contrui active si din cea cu dispozitive conectate.
+				Daca efectuez quit de la server, eliberez memoria si parcurg lista de clienti conectati si logati si inchid socket-urile aferente, si anunt fiecare client in parte pentru a sti sa se inchida.
+				
+
+	3. Explicare implementare login:
+
+			Exemplu fisier log:
+				login 9999999 9
+				ATM> -4 : Numar card inexistent
+
+				login 999999 9
+				ATM> -3 : Pin gresit
+
+				login 999999 9
+				ATM> -3 : Pin gresit
+
+				login 456123 8799
+				ATM> Welcome Popovici George
+		
+				logout
+				ATM> Deconectare de la bancomat
+
+				login 999999 9
+				ATM> -5 : Card blocat
+
+			Implemenatarea facuta pentru login este in felul urmator: pentru fiecare cont retin in structura de date numarul de incercari gresite efectuate consecutive, pentru fiecare cont in parte.
+		Acest numar il resetez, il fac 0, daca pe contul respectiv a avut loc o operatie de login finalizata cu succes, s-a reusit logarea pe contul acela.
+		Aceasta implementare imi permite ca pentru orice cont, daca se primeste de 3 ori parola gresita pe ntru acel cont, el sa se blocheze, necontand clientul din care se realizeaza operatia de login.
+			Astfel, dupa cum se poate observa din exemplul de fisier log de mai sus, se incearca logarea pe cardul cu numarul 999999, se introduce parola gresita de 2 ori, se incerca logarea apo pe cardul
+		cu numarul 456123, se reuseste, se da logout, iar apoi se reincearca pe contul cu numarul de card 999999 si se introduce din nou o parla gresita, acest lucru ducand la blocarea contului cu numarul
+		de card 999999, deoarce pentru acesta s-au introdus 3 parole gresie consecutive, fara a se avea ca rezultat logarea cu succes pe acel cont.
+			De asemenea, cum se poate observa in cele 2 fisere ".log", in client-9002.log se realizeaza incercarea de logare pe contul 999999 si se introduce parola gresita de 2 ori, iar apoi in fisierul
+		client-9004.log se incearca logarea pe contul 999999 si se introduce parola gresita din nou, fiind a 3-a oara consecutiv gresita pentru contul cu numarul de card 999999, acest lucru blocand acel numar de card.
+ 
+
+	4. Eliberarea memoriei:
+	
+			Eliberarea memoriei consta in eliberarea memorie alocate pentru fiecare structura de tip cont, a vectorului de pointeri catre acele strucuturi si eliberarea memoriei ocupate de fiecare
+		lista.
+			Memoria se elibereaz in momentul in care server-ul anunta ce se inchide, daca se citeste quit de la terminalul in care e deschis server-ul.
+	
